@@ -1,4 +1,5 @@
-# Campo Minado
+# **================= Campo Minado =================**
+
 
 > Trabalho desenvolvido para o 2º Semestre do curso de Engenharia da Computação.
 
@@ -42,16 +43,16 @@ Instale as dependências:
 
 ---
 
-## 4 - Mapa da Arquitetura do Código
+## 4 - Arquitetura do Código
 
-O código-fonte está organizado nas seguintes seções funcionais:
-
-4.1. **Constantes, Temas e Dificuldades:** Definição das configurações globais, resoluções e matrizes de cores.
-4.2. **Modificadores:** Sistema de registro e aplicação de regras/modificadores de jogo (`aplicar_modificadores`).
-4.3. **Lógica do Tabuleiro:** Matrizes de dados, geração de minas, algoritmo de revelação em cascata, marcação e verificação de vitória.
-4.4. **Fim de Jogo:** Animações de derrota/vitória (`animar_derrota`, `animar_vitoria`), cálculo de pontuação e persistência de recordes.
-4.5. **Renderização / Desenho:** Primitivas gráficas, renderização do tabuleiro, HUD, menus e pop-ups.
-4.6. **Fluxo do Jogo e Eventos:** Loop principal da aplicação e tratamento de inputs utilizando sintaxe `match-case`.
+| Seção | Módulo | Descrição / Responsabilidades |
+| :---: | :--- | :--- |
+| **4.1** | **Constantes e Temas** | Paletas de cores (`TEMAS`), configurações e dificuldades |
+| **4.2** | **Modificadores** | Registro e aplicação de modificadores do jogo (`aplicar_modificadores`) |
+| **4.3** | **Lógica do Tabuleiro** | Matrizes, geração do campo, algoritmo em cascata, marcação e vitória |
+| **4.4** | **Fim de Jogo** | Animações (`animar_derrota`/`vitoria`), sistema de pontuação e recordes |
+| **4.5** | **Interface (UI/Desenho)** | Primitivas visuais, renderização do tabuleiro, HUD, menus e pop-ups |
+| **4.6** | **Loop Principal** | Tratamento de eventos (`match-case`) e fluxo de execução do Pygame |
 
 ---
 
