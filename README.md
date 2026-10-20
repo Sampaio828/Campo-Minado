@@ -1,37 +1,60 @@
-# Campo-Minado
-Trabalho para o 2° Semestre da faculdade de engenharia da computação.
+# Campo Minado
 
-=================================================
-                   CAMPO MINADO
-=================================================
+> Trabalho desenvolvido para o 2º Semestre do curso de Engenharia da Computação.
 
-Requer Python 3.10+ e Pygame, rode os seguintes comandos no seu CMD:
+Um jogo de Campo Minado desenvolvido em Python utilizando a biblioteca **Pygame**, com suporte a temas visuais customizáveis, animações e sistema de pontuação.
 
-Instalar pygame:
-    pip install pygame
-		
-Verificar versão do seu python:
-    python --version
-		
-Executar o jogo:
-        python campo_minado.py
+---
 
---------------------------------------------------------------------------------------------------
+## 1 - Pré-requisitos
 
-CONTROLES:
-    Clique esquerdo ........ revela a célula
-    Clique direito / F ..... marca / desmarca bomba
-    R ...................... nova partida
-    ESC ... voltar
+O projeto requer **Python 3.10** ou superior e a biblioteca **Pygame**.
 
---------------------------------------------------------------------------------------------------
+Para verificar a versão atual do seu Python, execute no terminal:
+```bash
+python --version
+```
 
-MAPA DO CÓDIGO:
-    1. CONSTANTES, TEMAS (paletas) e DIFICULDADES
-    2. MODIFICADORES (registro + aplicar_modificadores)
-    3. LÓGICA DO TABULEIRO (matrizes, geração, cascata, marcação, vitória)
-    4. FIM DE JOGO (animar_derrota / animar_vitoria / pontuação / recordes)
-    5. DESENHO (primitivas, tabuleiro, HUD, menu, pop-up)
-    6. EVENTOS / FLUXO (match-case) e LOOP PRINCIPAL
-	
---------------------------------------------------------------------------------------------------
+Instale as dependências:
+   ```bash
+   pip install pygame
+   ```
+---
+
+## 2 - Como Executar o Jogo
+
+
+2.1. **Execute o script principal:**
+   ```bash
+   python campo_minado.py
+   ```
+
+---
+
+## 3 - Controles
+
+| Ação | Comando |
+| :--- | :--- |
+| **Revelar célula** | `Clique Esquerdo` |
+| **Marcar / Desmarcar bandeira** | `Clique Direito` ou tecla `F` |
+| **Nova partida** | Tecla `R` |
+| **Voltar ao menu / Sair** | Tecla `ESC` |
+
+---
+
+## 4 - Mapa da Arquitetura do Código
+
+O código-fonte está organizado nas seguintes seções funcionais:
+
+4.1. **Constantes, Temas e Dificuldades:** Definição das configurações globais, resoluções e matrizes de cores.
+4.2. **Modificadores:** Sistema de registro e aplicação de regras/modificadores de jogo (`aplicar_modificadores`).
+4.3. **Lógica do Tabuleiro:** Matrizes de dados, geração de minas, algoritmo de revelação em cascata, marcação e verificação de vitória.
+4.4. **Fim de Jogo:** Animações de derrota/vitória (`animar_derrota`, `animar_vitoria`), cálculo de pontuação e persistência de recordes.
+4.5. **Renderização / Desenho:** Primitivas gráficas, renderização do tabuleiro, HUD, menus e pop-ups.
+4.6. **Fluxo do Jogo e Eventos:** Loop principal da aplicação e tratamento de inputs utilizando sintaxe `match-case`.
+
+---
+
+## 5 - Licença
+
+Este projeto foi desenvolvido estritamente para fins acadêmicos.
