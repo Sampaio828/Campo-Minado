@@ -1,27 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-CAMPO MINADO MINIMALISTA  (bombas = engrenagens)
-=================================================
-Arquivo único, modular e extensível.  Requer Python 3.10+ e Pygame:
-
-    pip install pygame
-    python campo_minado.py
-
-CONTROLES
-    Clique esquerdo ........ revela a célula
-    Clique direito / F ..... marca / desmarca (ou use o botão de modo embaixo)
-    R ...................... nova partida   |   ESC ... voltar
-
-MAPA DO CÓDIGO
-    1. CONSTANTES, TEMAS (paletas) e DIFICULDADES
-    2. MODIFICADORES (registro + aplicar_modificadores)
-    3. LÓGICA DO TABULEIRO (matrizes, geração, cascata, marcação, vitória)
-    4. FIM DE JOGO (animar_derrota / animar_vitoria / pontuação / recordes)
-    5. DESENHO (primitivas, tabuleiro, HUD, menu, pop-up)
-    6. EVENTOS / FLUXO (match-case) e LOOP PRINCIPAL
-"""
-
 import json
 import math
 import random
@@ -38,7 +16,7 @@ import pygame
 # =============================================================================
 # 1. CONSTANTES, TEMAS E DIFICULDADES
 # =============================================================================
-LARGURA, ALTURA = 450, 800          # janela em formato "celular" (escala automática)
+LARGURA, ALTURA = 450, 800          # janela em formato celular
 FPS = 60
 
 # Estados possíveis de cada célula (matriz jogo["estado"])
@@ -51,8 +29,6 @@ except NameError:                    # execução interativa
 
 # -----------------------------------------------------------------------------
 # >>> PALETAS DE CORES  <<<
-# Para criar um novo tema, basta adicionar uma entrada neste dicionário com
-# as mesmas chaves. Ele aparece automaticamente no seletor de paletas.
 #   fundo     : cor de fundo da tela e das células reveladas
 #   celula    : cor de destaque (células ocultas, botões ativos, logo)
 #   texto     : números, rótulos e ícones
@@ -129,8 +105,7 @@ TEMAS = {
 TEMA_PADRAO = "Margarida"
 
 # -----------------------------------------------------------------------------
-# DIFICULDADES  (a quantidade de bombas sorteada fica entre "min" e "max")
-# Para criar outra: adicione aqui, inclua em ORDEM_DIF e em multiplicador_dificuldade().
+# DIFICULDADES  (a quantidade de bombas sorteada fica entre "min" e "max").
 # -----------------------------------------------------------------------------
 DIFICULDADES = {
     "Fácil":   dict(cols=6, linhas=10, min=5,  max=7),
