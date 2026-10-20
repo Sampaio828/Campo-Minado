@@ -1,4 +1,4 @@
-# **================= Campo Minado =================**
+# **======= Campo Minado =======**
 
 
 > Trabalho desenvolvido para o 2º Semestre do curso de Engenharia da Computação.
