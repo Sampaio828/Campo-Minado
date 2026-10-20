@@ -1,5 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+CAMPO MINADO MINIMALISTA  (bombas = engrenagens)
+=================================================
+Arquivo único, modular e extensível.  Requer Python 3.10+ e Pygame:
+
+    pip install pygame
+    python campo_minado.py
+
+CONTROLES
+    Clique esquerdo ........ revela a célula
+    Clique direito / F ..... marca / desmarca (ou use o botão de modo embaixo)
+    R ...................... nova partida   |   ESC ... voltar
+
+MAPA DO CÓDIGO
+    1. CONSTANTES, TEMAS (paletas) e DIFICULDADES
+    2. MODIFICADORES (registro + aplicar_modificadores)
+    3. LÓGICA DO TABULEIRO (matrizes, geração, cascata, marcação, vitória)
+    4. FIM DE JOGO (animar_derrota / animar_vitoria / pontuação / recordes)
+    5. DESENHO (primitivas, tabuleiro, HUD, menu, pop-up)
+    6. EVENTOS / FLUXO (match-case) e LOOP PRINCIPAL
+"""
+
 import json
 import math
 import random
@@ -16,7 +38,7 @@ import pygame
 # =============================================================================
 # 1. CONSTANTES, TEMAS E DIFICULDADES
 # =============================================================================
-LARGURA, ALTURA = 450, 800          # janela em formato celular
+LARGURA, ALTURA = 450, 800          # janela em formato "celular" (escala automática)
 FPS = 60
 
 # Estados possíveis de cada célula (matriz jogo["estado"])
@@ -29,6 +51,8 @@ except NameError:                    # execução interativa
 
 # -----------------------------------------------------------------------------
 # >>> PALETAS DE CORES  <<<
+# Para criar um novo tema, basta adicionar uma entrada neste dicionário com
+# as mesmas chaves. Ele aparece automaticamente no seletor de paletas.
 #   fundo     : cor de fundo da tela e das células reveladas
 #   celula    : cor de destaque (células ocultas, botões ativos, logo)
 #   texto     : números, rótulos e ícones
@@ -105,7 +129,8 @@ TEMAS = {
 TEMA_PADRAO = "Margarida"
 
 # -----------------------------------------------------------------------------
-# DIFICULDADES  (a quantidade de bombas sorteada fica entre "min" e "max").
+# DIFICULDADES  (a quantidade de bombas sorteada fica entre "min" e "max")
+# Para criar outra: adicione aqui, inclua em ORDEM_DIF e em multiplicador_dificuldade().
 # -----------------------------------------------------------------------------
 DIFICULDADES = {
     "Fácil":   dict(cols=6, linhas=10, min=5,  max=7),
@@ -182,7 +207,7 @@ def aplicar_modificadores(jogo, evento, **kw):
 
             # ---- Temporizado ----
             case ("temporizado", "inicio"):
-                jogo["tempo_limite"] = 45 + 6 * jogo["n_bombas"]
+                jogo["tempo_limite"] = 30 + 3 * jogo["n_bombas"]
             case ("temporizado", "tick"):
                 if tempo_decorrido(jogo) >= jogo["tempo_limite"]:
                     motivo = "tempo esgotado"
@@ -803,17 +828,51 @@ def desenhar_confetes(tela, jogo):
 # ---- Telas -------------------------------------------------------------------
 def desenhar_jogo(tela, app, t_agora):
     jogo = app["jogo"]
+    duracao_transicao = 0.35  # Tempo em segundos
+    t_decorrido = t_agora - jogo.get("t_inicio_transicao", t_agora)
+
+    if t_decorrido < duracao_transicao:
+        # Progresso normalizado (0.0 a 1.0) com easing out-quad para suavidade
+        progresso = min(1.0, t_decorrido / duracao_transicao)
+        p_suave = 1.0 - (1.0 - progresso) ** 2
+
+        # Escala: inicia em 60% (0.6) e vai até 100% (1.0)
+        escala = 0.6 + 0.4 * p_suave
+        
+        # Opacidade: inicia em 60% (153/255) e vai até 100% (255)
+        opacidade = int(255 * (0.6 + 0.4 * p_suave))
+
+        # Renderiza a cena do jogo em uma superfície temporária
+        surf_temp = pygame.Surface((LARGURA, ALTURA))
+        surf_temp.fill(app["tema"]["fundo"])
+        _desenhar_conteudo_jogo(surf_temp, app, t_agora)
+
+        # Redimensiona a superfície com interpolação suave
+        larg_nova = max(1, int(LARGURA * escala))
+        alt_nova = max(1, int(ALTURA * escala))
+        surf_redim = pygame.transform.smoothscale(surf_temp, (larg_nova, alt_nova))
+        surf_redim.set_alpha(opacidade)
+
+        # Desenha a cena centralizada na janela
+        rect = surf_redim.get_rect(center=(LARGURA // 2, ALTURA // 2))
+        tela.blit(surf_redim, rect)
+    else:
+        # Renderização normal sem custo adicional de superfície após o término da transição
+        _desenhar_conteudo_jogo(tela, app, t_agora)
+
+def _desenhar_conteudo_jogo(tela, app, t_agora):
+    """Renderiza os elementos nativos da tela do jogo."""
+    jogo = app["jogo"]
     desenhar_hud(tela, app, jogo)
     desenhar_tabuleiro(tela, app, jogo, t_agora)
     if jogo["fase"] in ("AGUARDANDO", "JOGANDO"):
         desenhar_seletor_modo(tela, app, jogo)
     if jogo["fase"] == "AGUARDANDO":
         texto(tela, app["fontes"]["mini"], "toque numa célula para começar",
-              misturar(app["tema"]["fundo"], app["tema"]["texto"], 0.6), centro=(LARGURA // 2, 116))
+                misturar(app["tema"]["fundo"], app["tema"]["texto"], 0.6), centro=(LARGURA // 2, 116))
     desenhar_confetes(tela, jogo)
     if jogo["fase"] == "RESULTADO":
         desenhar_popup(tela, app, jogo)
-
 
 def desenhar_menu(tela, app):
     t, F, cfg = app["tema"], app["fontes"], app["config"]
@@ -832,7 +891,7 @@ def desenhar_menu(tela, app):
     app["ui"]["dif_prox"] = pygame.Rect(LARGURA - 140, y_sel - 30, 90, 60)
     # Novo jogo
     y_novo = y_sel + 60
-    desenhar_botao(tela, app, "novo", pygame.Rect(58, y_novo - 22, LARGURA - 116, 44), "New Game", F["m"])
+    desenhar_botao(tela, app, "novo", pygame.Rect(58, y_novo - 22, LARGURA - 116, 44), "Novo Jogo", F["m"])
 
     # Lista expansível de modificadores
     if aberto:
@@ -891,19 +950,18 @@ def desenhar_ajuda(tela, app):
     app["ui"]["voltar"] = pygame.Rect(5, 40, 70, 70)
     texto(tela, F["g"], "Como jogar", t["texto"], centro=(LARGURA // 2, 150))
     linhas = [
-        "Revele todas as células sem engrenagens.",
-        "Os números indicam quantas engrenagens",
-        "existem nas 8 células vizinhas.",
+        "Revele todas as células sem bombas.",
+        "Os números indicam quantas bombas",
+        "existem nas 8 células adjacentes.",
         "",
         "Clique esquerdo: revelar",
         "Clique direito / tecla F: marcar",
-        "(ou use o botão de modo embaixo)",
-        "Células marcadas ficam protegidas.",
+        "R: nova partida    ESC: voltar",
         "",
-        "O contador mostra bombas menos marcações.",
+        "O contador mostra bombas restantes.",
         "O primeiro clique nunca é uma bomba.",
         "",
-        "R: nova partida    ESC: voltar",
+        
     ]
     for i, s in enumerate(linhas):
         texto(tela, F["p"], s, t["texto"], centro=(LARGURA // 2, 215 + i * 30))
@@ -933,6 +991,7 @@ def desenhar_interface(tela, app, t_agora):
 def iniciar_jogo(app):
     cfg = app["config"]
     app["jogo"] = criar_estado_jogo(ORDEM_DIF[cfg["dif_idx"]], cfg["mods"])
+    app["jogo"]["t_inicio_transicao"] = agora()  # Marca o tempo inicial da animação
     app["paleta_aberta"] = False
     app["tela"] = "JOGO"
 
@@ -987,6 +1046,9 @@ def acionar_botao(app, chave):
 
 
 def tratar_clique(app, pos, botao):
+    if app["tela"] == "JOGO" and app.get("jogo"):
+        if agora() - app["jogo"].get("t_inicio_transicao", 0) < 0.35:
+            return
     # 1) Botões da interface (de cima para baixo: o último desenhado vence)
     if botao == 1:
         for chave, rect in reversed(list(app["ui"].items())):
