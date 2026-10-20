@@ -1,27 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-CAMPO MINADO MINIMALISTA  (bombas = engrenagens)
-=================================================
-Arquivo único, modular e extensível.  Requer Python 3.10+ e Pygame:
-
-    pip install pygame
-    python campo_minado.py
-
-CONTROLES
-    Clique esquerdo ........ revela a célula
-    Clique direito / F ..... marca / desmarca (ou use o botão de modo embaixo)
-    R ...................... nova partida   |   ESC ... voltar
-
-MAPA DO CÓDIGO
-    1. CONSTANTES, TEMAS (paletas) e DIFICULDADES
-    2. MODIFICADORES (registro + aplicar_modificadores)
-    3. LÓGICA DO TABULEIRO (matrizes, geração, cascata, marcação, vitória)
-    4. FIM DE JOGO (animar_derrota / animar_vitoria / pontuação / recordes)
-    5. DESENHO (primitivas, tabuleiro, HUD, menu, pop-up)
-    6. EVENTOS / FLUXO (match-case) e LOOP PRINCIPAL
-"""
-
 import json
 import math
 import random
@@ -133,9 +111,9 @@ TEMA_PADRAO = "Margarida"
 # Para criar outra: adicione aqui, inclua em ORDEM_DIF e em multiplicador_dificuldade().
 # -----------------------------------------------------------------------------
 DIFICULDADES = {
-    "Fácil":   dict(cols=6, linhas=10, min=5,  max=7),
-    "Média":   dict(cols=7, linhas=12, min=8,  max=12),
-    "Difícil": dict(cols=8, linhas=14, min=18, max=24),   # maior proporção de bombas
+    "Fácil":   dict(cols=6, linhas=10, min=5,  max=10),
+    "Média":   dict(cols=7, linhas=12, min=11,  max=19),
+    "Difícil": dict(cols=8, linhas=14, min=20, max=30),   # maior proporção de bombas
 }
 ORDEM_DIF = ["Fácil", "Média", "Difícil"]
 
@@ -315,13 +293,16 @@ def revelar_em_cascata(jogo, l, c):
 
 
 def marcar_celula(jogo, l, c):
-    """Marca/desmarca célula suspeita (só em células ocultas)."""
+    """Marca/desmarca célula suspeita (respeitando o limite máximo de bombas)."""
     if jogo["fase"] not in ("AGUARDANDO", "JOGANDO"):
         return
     match jogo["estado"][l][c]:
         case 0:   # OCULTA
-            jogo["estado"][l][c] = MARCADA
+            # Só permite marcar se ainda houver bombas disponíveis no contador
+            if bombas_restantes(jogo) > 0:
+                jogo["estado"][l][c] = MARCADA
         case 2:   # MARCADA
+            # Desmarcar é sempre permitido para liberar bandeiras
             jogo["estado"][l][c] = OCULTA
         case _:
             pass
@@ -523,7 +504,7 @@ def desenhar_engrenagem(tela, cx, cy, r, cor, cor_furo=None, dentes=8):
 
 
 def desenhar_bomba(tela, cx, cy, r, cor, cor_furo=None):
-    """Bomba/mina: corpo redondo, 4 espinhos longos (cardeais), 4 curtos (diagonais) e brilho."""
+    """Bomba/mina: corpo redondo, 8 espinhos e ponto de brilho no canto superior direito."""
     pygame.draw.circle(tela, cor, (cx, cy), max(2, int(r * 0.62)))
     w = max(1.0, r * 0.065)
     for i in range(8):
@@ -537,8 +518,16 @@ def desenhar_bomba(tela, cx, cy, r, cor, cor_furo=None):
             (cx + ux * r1 + px * w, cy + uy * r1 + py * w),
             (cx + ux * r1 - px * w, cy + uy * r1 - py * w),
             (cx + ux * r0 - px * w, cy + uy * r0 - py * w)])
+                    
+    # --- BRILHO DA BOMBA ---
     if cor_furo:
-        pygame.draw.circle(tela, cor_furo, (cx - r * 0.06, cy - r * 0.06), max(1, int(r * 0.1)))
+        # cx + r * 0.18 -> Move para a DIREITA
+        # cy - r * 0.18 -> Move para CIMA
+        pos_x = int(cx + r * 0.18)
+        pos_y = int(cy - r * 0.18)
+        raio_brilho = max(1, int(r * 0.12))
+                
+        pygame.draw.circle(tela, cor_furo, (pos_x, pos_y), raio_brilho)
 
 
 def desenhar_bandeira(tela, cx, cy, tam, cor):
@@ -552,14 +541,14 @@ def desenhar_bandeira(tela, cx, cy, tam, cor):
 
 def desenhar_seta(tela, cx, cy, direcao, cor, tam=11):
     """direcao: -1 esquerda, +1 direita."""
-    pygame.draw.lines(tela, cor, False, [(cx - direcao * tam * 0.5, cy - tam),
+    pygame.draw.lines(tela, cor, False, [(cx - direcao * tam * 0.7, cy - tam),
                                          (cx + direcao * tam * 0.5, cy),
                                          (cx - direcao * tam * 0.5, cy + tam)], 4)
 
 
 def desenhar_seta_voltar(tela, cx, cy, cor):
     pygame.draw.line(tela, cor, (cx - 16, cy), (cx + 14, cy), 4)
-    pygame.draw.lines(tela, cor, False, [(cx - 4, cy - 12), (cx - 16, cy), (cx - 4, cy + 12)], 4)
+    pygame.draw.lines(tela, cor, False, [(cx - 4, cy - 12), (cx - 16, cy), (cx - 4, cy + 12)], 6)
 
 
 def desenhar_icone_lista(tela, cx, cy, cor):
@@ -880,7 +869,7 @@ def desenhar_menu(tela, app):
     cx = LARGURA // 2
     # Logo
     # (posições fixas: abrir/fechar a lista de modificadores não move nem redimensiona nada)
-    desenhar_bomba(tela, cx, 285, 88, t["celula"], t["fundo"])
+    desenhar_bomba(tela, cx, 200, 110, t["celula"], t["fundo"])
     # Seletor de dificuldade
     y_sel = 416
     nome = ORDEM_DIF[cfg["dif_idx"]]
