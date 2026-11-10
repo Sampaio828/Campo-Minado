@@ -27,6 +27,11 @@ try:
 except NameError:                    # execução interativa
     ARQ_RECORDES = Path("recordes_campo_minado.json")
 
+try:
+    PASTA_ICONES = Path(__file__).with_name("assets") / "icons"
+except NameError:
+    PASTA_ICONES = Path("assets") / "icons"
+
 # -----------------------------------------------------------------------------
 # >>> PALETAS DE CORES  <<<
 # Para criar um novo tema, basta adicionar uma entrada neste dicionário com
@@ -132,86 +137,7 @@ def multiplicador_dificuldade(nome):
 
 
 # =============================================================================
-# 2. MODIFICADORES
-# =============================================================================
-# -----------------------------------------------------------------------------
-# >>> COMO ADICIONAR UM NOVO MODIFICADOR <<<
-#   1) Registre-o no dicionário abaixo (id -> nome + descrição).
-#   2) Em aplicar_modificadores(), adicione `case ("seu_id", "<evento>")` para
-#      cada evento em que ele deve agir.  Eventos disponíveis:
-#        "inicio"    -> partida criada (configure variáveis em `jogo`)
-#        "revelar"   -> jogador revelou uma célula oculta
-#        "bomba"     -> jogador pisou numa bomba (defina absorvido=True p/ salvar)
-#        "tick"      -> a cada frame (defina motivo="..." para causar derrota)
-#        "hud"       -> acrescente textos de status em `linhas`
-#        "pontuacao" -> altere o multiplicador `mult`
-#   3) (Opcional) efeitos puramente visuais: use modificador_ativo() nas
-#      funções de desenho (ex.: bombas visíveis em desenhar_tabuleiro).
-# -----------------------------------------------------------------------------
-MODIFICADORES = {
-    "bombas_visiveis": dict(nome="Bombas visíveis", desc="Mostra as bombas em tom suave"),
-    "temporizado":     dict(nome="Modo temporizado", desc="Tempo limitado para vencer"),
-}
-
-
-def modificador_ativo(jogo, mod_id):
-    return mod_id in jogo["mods"]
-
-
-def alternar_modificador(config, mod_id):
-    if mod_id in config["mods"]:
-        config["mods"].remove(mod_id)
-    else:
-        config["mods"].add(mod_id)
-
-
-def aplicar_modificadores(jogo, evento, **kw):
-    """
-    Ponto único de integração dos modificadores.
-    Retorna conforme o evento:
-        "bomba" -> bool (True = bomba absorvida)   "tick" -> str|None (motivo de derrota)
-        "hud"   -> list[str]                       "pontuacao" -> float (multiplicador)
-        demais  -> None
-    """
-    absorvido, motivo, mult, linhas = False, None, 1.0, []
-
-    for mod_id in MODIFICADORES:                     # ordem do registro
-        if mod_id not in jogo["mods"]:
-            continue
-        match (mod_id, evento):
-            # ---- Bombas visíveis (efeito visual tratado no desenho) ----
-            case ("bombas_visiveis", "pontuacao"):
-                mult *= 0.5
-
-            # ---- Temporizado ----
-            case ("temporizado", "inicio"):
-                jogo["tempo_limite"] = 30 + 3 * jogo["n_bombas"]
-            case ("temporizado", "tick"):
-                if tempo_decorrido(jogo) >= jogo["tempo_limite"]:
-                    motivo = "tempo esgotado"
-            case ("temporizado", "hud"):
-                resta = max(0, int(jogo["tempo_limite"] - tempo_decorrido(jogo)))
-                linhas.append(f"restam {formatar_tempo(resta)}")
-            case ("temporizado", "pontuacao"):
-                mult *= 1.3
-
-            # >>> NOVOS MODIFICADORES: adicione seus `case` aqui <<<
-
-    match evento:
-        case "bomba":
-            return absorvido
-        case "tick":
-            return motivo
-        case "hud":
-            return linhas
-        case "pontuacao":
-            return mult
-        case _:
-            return None
-
-
-# =============================================================================
-# 3. LÓGICA DO TABULEIRO
+# 2. LÓGICA DO TABULEIRO
 # =============================================================================
 def agora():
     return time.monotonic()
@@ -222,7 +148,7 @@ def formatar_tempo(seg):
     return f"{seg}S" if seg < 60 else f"{seg // 60}:{seg % 60:02d}"
 
 
-def criar_estado_jogo(dificuldade, mods):
+def criar_estado_jogo(dificuldade):
     """Cria o estado de uma partida. O tabuleiro só é gerado no 1º clique."""
     p = DIFICULDADES[dificuldade]
     cols, linhas = p["cols"], p["linhas"]
@@ -235,14 +161,12 @@ def criar_estado_jogo(dificuldade, mods):
         "estado":   [[OCULTA] * cols for _ in range(linhas)],  # oculta/revelada/marcada
         "fase": "AGUARDANDO",       # AGUARDANDO > JOGANDO > ANIM_* > RESULTADO
         "inicio": 0.0, "fim": 0.0, "cliques": 0,
-        "mods": set(mods), "modo_bandeira": False,
-        "tempo_limite": None,
+        "modo_bandeira": False,
         "estouradas": {}, "fila_estouros": [], "prox_estouro": 0.0,
         "intervalo": 0.15, "bomba_fatal": None, "ultimo_estouro": 0.0,
         "confetes": [], "t_fim_anim": 0.0, "resultado": None,
         "geo": calcular_geometria(cols, linhas),
     }
-    aplicar_modificadores(jogo, "inicio")
     return jogo
 
 
@@ -336,11 +260,9 @@ def processar_clique(jogo, l, c):
         jogo["fase"] = "JOGANDO"
         jogo["inicio"] = agora()
     jogo["cliques"] += 1
-    aplicar_modificadores(jogo, "revelar")
 
     if jogo["bombas"][l][c]:
-        if not aplicar_modificadores(jogo, "bomba", l=l, c=c):
-            iniciar_derrota(jogo, (l, c))
+        iniciar_derrota(jogo, (l, c))
         return
     revelar_em_cascata(jogo, l, c)
     if verificar_vitoria(jogo):
@@ -358,7 +280,7 @@ def tempo_decorrido(jogo):
 
 
 # =============================================================================
-# 4. FIM DE JOGO: ANIMAÇÕES, PONTUAÇÃO E RECORDES
+# 3. FIM DE JOGO: ANIMAÇÕES, PONTUAÇÃO E RECORDES
 # =============================================================================
 def iniciar_derrota(jogo, fatal):
     jogo["fase"] = "ANIM_DERROTA"
@@ -425,7 +347,7 @@ def calcular_pontuacao(jogo, tempo, vitoria):
     seguras = sum(row.count(REVELADA) for row in jogo["estado"])
     base = seguras * 10 + (jogo["n_bombas"] * 50 if vitoria else 0)
     base -= int(tempo) * 2 + jogo["cliques"] * 3
-    mult = multiplicador_dificuldade(jogo["dif"]) * aplicar_modificadores(jogo, "pontuacao")
+    mult = multiplicador_dificuldade(jogo["dif"])
     return max(0, int(base * mult))
 
 
@@ -449,7 +371,7 @@ def registrar_recorde(app, dif, pontos, tempo):
     novo = dict(pontos=pontos, tempo=int(tempo), data=date.today().isoformat())
     lista.append(novo)
     lista.sort(key=lambda r: r["pontos"], reverse=True)
-    del lista[5:]
+    del lista[3:]
     salvar_recordes(app["recordes"])
     return next((i + 1 for i, r in enumerate(lista) if r is novo), None)
 
@@ -466,13 +388,13 @@ def finalizar_partida(app, jogo, vitoria):
 
 
 # =============================================================================
-# 5. DESENHO
+# 4. DESENHO
 # =============================================================================
 def misturar(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def texto(tela, fonte, s, cor, centro=None, esq=None, dire=None):
+def texto(tela, fonte, s, cor, centro=None, esq=None, dire=None, dy=0):
     img = fonte.render(s, True, cor)
     r = img.get_rect()
     if centro:
@@ -481,93 +403,48 @@ def texto(tela, fonte, s, cor, centro=None, esq=None, dire=None):
         r.midleft = esq
     elif dire:
         r.midright = dire
+    r.y += dy
     tela.blit(img, r)
     return r
 
 
-def desenhar_engrenagem(tela, cx, cy, r, cor, cor_furo=None, dentes=8):
-    pygame.draw.circle(tela, cor, (cx, cy), int(r * 0.78))
-    w = r * 0.17
-    for i in range(dentes):
-        a = 2 * math.pi * i / dentes
-        ux, uy = math.cos(a), math.sin(a)
-        px, py = -uy, ux
-        r0, r1 = r * 0.6, r
-        pygame.draw.polygon(tela, cor, [
-            (cx + ux * r0 + px * w, cy + uy * r0 + py * w),
-            (cx + ux * r1 + px * w, cy + uy * r1 + py * w),
-            (cx + ux * r1 - px * w, cy + uy * r1 - py * w),
-            (cx + ux * r0 - px * w, cy + uy * r0 - py * w)])
-    if cor_furo:
-        s = r * 0.17
-        pygame.draw.rect(tela, cor_furo, (cx - s, cy - s, 2 * s, 2 * s), border_radius=max(1, int(s * 0.3)))
+# -----------------------------------------------------------------------------
+# ÍCONES (arquivos em assets/icons/)
+# Cada ícone é um SVG (ou PNG) BRANCO com fundo transparente, desenhado no Figma
+# em 256x256. O jogo pinta o ícone com a cor do tema na hora de desenhar e guarda o
+# resultado em cache, então trocar de paleta recolore tudo sozinho.
+# Detalhes "furados" (brilho da bomba, furo da engrenagem, "i" etc.) devem ser
+# recortes transparentes no Figma, não cores de fundo.
+# Para adicionar um ícone novo: salve assets/icons/<nome>.svg e chame
+# desenhar_icone(tela, app, "<nome>", centro, tamanho, cor).
+# -----------------------------------------------------------------------------
+def carregar_icone(nome, tam):
+    """Carrega assets/icons/<nome>.svg (ou .png) e redimensiona para tam x tam."""
+    for ext in (".svg", ".png"):
+        arq = PASTA_ICONES / (nome + ext)
+        if arq.exists():
+            img = pygame.image.load(str(arq)).convert_alpha()
+            return pygame.transform.smoothscale(img, (tam, tam))
+    raise FileNotFoundError(f"Ícone não encontrado: {PASTA_ICONES / nome}.svg")
 
 
-def desenhar_bomba(tela, cx, cy, r, cor, cor_furo=None):
-    """Bomba/mina: corpo redondo, 8 espinhos e ponto de brilho no canto superior direito."""
-    pygame.draw.circle(tela, cor, (cx, cy), max(2, int(r * 0.62)))
-    w = max(1.0, r * 0.065)
-    for i in range(8):
-        a = math.pi / 4 * i
-        ux, uy = math.cos(a), math.sin(a)
-        px, py = -uy, ux
-        r0 = r * 0.5
-        r1 = r if i % 2 == 0 else r * 0.8
-        pygame.draw.polygon(tela, cor, [
-            (cx + ux * r0 + px * w, cy + uy * r0 + py * w),
-            (cx + ux * r1 + px * w, cy + uy * r1 + py * w),
-            (cx + ux * r1 - px * w, cy + uy * r1 - py * w),
-            (cx + ux * r0 - px * w, cy + uy * r0 - py * w)])
-                    
-    # --- BRILHO DA BOMBA ---
-    if cor_furo:
-        # cx + r * 0.18 -> Move para a DIREITA
-        # cy - r * 0.18 -> Move para CIMA
-        pos_x = int(cx + r * 0.18)
-        pos_y = int(cy - r * 0.18)
-        raio_brilho = max(1, int(r * 0.12))
-                
-        pygame.draw.circle(tela, cor_furo, (pos_x, pos_y), raio_brilho)
+def icone(app, nome, tam, cor, espelhar=False):
+    """Devolve o ícone na cor pedida (cache por nome, tamanho, cor e espelhamento)."""
+    tam = max(1, int(tam))
+    chave = (nome, tam, tuple(cor), espelhar)
+    cache = app["cache_icones"]
+    if chave not in cache:
+        img = carregar_icone(nome, tam)
+        if espelhar:
+            img = pygame.transform.flip(img, True, False)
+        img.fill((*cor, 255), special_flags=pygame.BLEND_RGBA_MULT)   # pinta mantendo o alfa
+        cache[chave] = img
+    return cache[chave]
 
 
-def desenhar_bandeira(tela, cx, cy, tam, cor):
-    h = tam * 0.6
-    x = cx - tam * 0.15
-    topo = cy - h / 2
-    pygame.draw.line(tela, cor, (x, topo), (x, cy + h / 2), max(2, int(tam * 0.07)))
-    pygame.draw.polygon(tela, cor, [(x, topo), (x + tam * 0.4, topo + tam * 0.11), (x, topo + tam * 0.24)])
-    pygame.draw.line(tela, cor, (x - tam * 0.12, cy + h / 2), (x + tam * 0.12, cy + h / 2), max(2, int(tam * 0.07)))
-
-
-def desenhar_seta(tela, cx, cy, direcao, cor, tam=11):
-    """direcao: -1 esquerda, +1 direita."""
-    pygame.draw.lines(tela, cor, False, [(cx - direcao * tam * 0.7, cy - tam),
-                                         (cx + direcao * tam * 0.5, cy),
-                                         (cx - direcao * tam * 0.5, cy + tam)], 4)
-
-
-def desenhar_seta_voltar(tela, cx, cy, cor):
-    pygame.draw.line(tela, cor, (cx - 16, cy), (cx + 14, cy), 4)
-    pygame.draw.lines(tela, cor, False, [(cx - 4, cy - 12), (cx - 16, cy), (cx - 4, cy + 12)], 6)
-
-
-def desenhar_icone_lista(tela, cx, cy, cor):
-    for i in (-9, 0, 9):
-        pygame.draw.circle(tela, cor, (cx - 14, cy + i), 2)
-        pygame.draw.line(tela, cor, (cx - 7, cy + i), (cx + 14, cy + i), 3)
-
-
-def desenhar_icone_info(tela, fontes, cx, cy, cor, fundo):
-    pygame.draw.circle(tela, cor, (cx, cy), 15)
-    texto(tela, fontes["m"], "i", fundo, centro=(cx, cy))
-
-
-def desenhar_icone_paleta(tela, cx, cy, cor, fundo):
-    pygame.draw.circle(tela, cor, (cx, cy), 17)
-    pygame.draw.circle(tela, cor, (cx + 12, cy + 12), 9)
-    pygame.draw.circle(tela, fundo, (cx + 13, cy + 13), 4)
-    for dx, dy in ((-6, -8), (4, -9), (-10, 2), (8, -1)):
-        pygame.draw.circle(tela, fundo, (cx + dx, cy + dy), 3)
+def desenhar_icone(tela, app, nome, centro, tam, cor, espelhar=False):
+    img = icone(app, nome, tam, cor, espelhar)
+    tela.blit(img, img.get_rect(center=(int(centro[0]), int(centro[1]))))
 
 
 def desenhar_botao(tela, app, chave, rect, rotulo, fonte, ativo=False):
@@ -581,7 +458,7 @@ def desenhar_botao(tela, app, chave, rect, rotulo, fonte, ativo=False):
             pygame.draw.rect(tela, misturar(t["fundo"], t["texto"], 0.07), rect, border_radius=rect.height // 2)
         pygame.draw.rect(tela, t["linha"], rect, 2, border_radius=rect.height // 2)
         cor_txt = t["texto"]
-    texto(tela, fonte, rotulo, cor_txt, centro=rect.center)
+    texto(tela, fonte, rotulo, cor_txt, centro=rect.center, dy=-4)
     app["ui"][chave] = rect
 
 
@@ -611,9 +488,9 @@ def desenhar_paleta(tela, app):
                 pygame.draw.circle(tela, t["celula"], (cx, cy), 24, 3)
             ui["tema_" + nome] = pygame.Rect(cx - 24, cy - 24, 48, 48)
         pygame.draw.circle(tela, t["celula"], centro, 28)
-        desenhar_icone_paleta(tela, centro[0], centro[1], t["texto_cel"], t["celula"])
+        desenhar_icone(tela, app, "paleta", centro, 48, t["texto_cel"])
     else:
-        desenhar_icone_paleta(tela, centro[0], centro[1], t["texto"], t["fundo"])
+        desenhar_icone(tela, app, "paleta", centro, 40, t["texto"])
     ui["paleta"] = pygame.Rect(centro[0] - 30, centro[1] - 30, 60, 60)
 
 
@@ -659,8 +536,6 @@ def desenhar_tabuleiro(tela, app, jogo, t_agora):
     x0, y0, tam = jogo["geo"]
     r = int(tam * 0.22)
     fonte = fonte_numeros(app, tam)
-    mostrar_bombas = modificador_ativo(jogo, "bombas_visiveis") and jogo["fase"] != "AGUARDANDO"
-    cor_fantasma = misturar(t["celula"], t["fundo"], 0.45)
 
     for l in range(jogo["linhas"]):
         for c in range(jogo["cols"]):
@@ -690,11 +565,9 @@ def desenhar_tabuleiro(tela, app, jogo, t_agora):
             if pos in jogo["estouradas"]:
                 if pos == jogo["bomba_fatal"]:
                     pygame.draw.rect(tela, t["perigo"], rect.inflate(-6, -6), border_radius=r)
-                desenhar_bomba(tela, rect.centerx, rect.centery, tam * 0.38, t["texto_cel"], t["celula"])
+                desenhar_icone(tela, app, "bomba", rect.center, tam * 0.81, t["texto_cel"])
             elif jogo["estado"][l][c] == MARCADA:
-                desenhar_bandeira(tela, rect.centerx, rect.centery, tam, t["texto_cel"])
-            elif mostrar_bombas and jogo["bombas"][l][c]:
-                desenhar_bomba(tela, rect.centerx, rect.centery, tam * 0.34, cor_fantasma)
+                desenhar_icone(tela, app, "bandeira", rect.center, tam, t["texto_cel"])
 
     # Cantos internos arredondados (côncavos), iguais aos externos
     desenhar_cantos_internos(tela, t, jogo, x0, y0, tam, r)
@@ -727,17 +600,14 @@ def pos_para_celula(jogo, pos):
 # ---- HUD ---------------------------------------------------------------------
 def desenhar_hud(tela, app, jogo):
     t, F = app["tema"], app["fontes"]
-    desenhar_seta_voltar(tela, 40, 76, t["texto"])
+    desenhar_icone(tela, app, "voltar", (40, 76), 40, t["texto"])
     app["ui"]["voltar"] = pygame.Rect(5, 40, 70, 70)
     cx = LARGURA // 2
-    desenhar_bomba(tela, cx - 24, 62, 14, t["texto"], t["fundo"])
-    texto(tela, F["m"], str(bombas_restantes(jogo)), t["texto"], esq=(cx - 6, 62))
+    desenhar_icone(tela, app, "bomba", (cx - 24, 62), 30, t["texto"])
+    texto(tela, F["m"], str(bombas_restantes(jogo)), t["texto"], esq=(cx - 6, 62), dy=-3)
     if jogo["fase"] != "AGUARDANDO":
         sub = misturar(t["fundo"], t["texto"], 0.7)
         texto(tela, F["p"], formatar_tempo(tempo_decorrido(jogo)), sub, centro=(cx, 92))
-        extras = aplicar_modificadores(jogo, "hud")      # status dos modificadores ativos
-        if extras:
-            texto(tela, F["mini"], "  ·  ".join(extras), sub, centro=(cx, 116))
 
 
 def desenhar_seletor_modo(tela, app, jogo):
@@ -753,10 +623,8 @@ def desenhar_seletor_modo(tela, app, jogo):
         if ativo:
             pygame.draw.circle(tela, t["celula"], (cx, pill.centery), 25)
         cor = t["texto_cel"] if ativo else t["texto"]
-        if eh_bandeira:
-            desenhar_bandeira(tela, cx, pill.centery, 38, cor)
-        else:
-            desenhar_engrenagem(tela, cx, pill.centery, 14, cor, t["celula"] if ativo else t["fundo"])
+        desenhar_icone(tela, app, "bandeira" if eh_bandeira else "engrenagem",
+                       (cx, pill.centery), 38 if eh_bandeira else 30, cor)
         ui[chave] = pygame.Rect(cx - 30, pill.y, 60, pill.height)
 
 
@@ -865,64 +733,40 @@ def _desenhar_conteudo_jogo(tela, app, t_agora):
 
 def desenhar_menu(tela, app):
     t, F, cfg = app["tema"], app["fontes"], app["config"]
-    aberto = app["lista_mods_aberta"]
     cx = LARGURA // 2
     # Logo
-    # (posições fixas: abrir/fechar a lista de modificadores não move nem redimensiona nada)
-    desenhar_bomba(tela, cx, 200, 110, t["celula"], t["fundo"])
+    desenhar_icone(tela, app, "bomba", (cx, 200), 235, t["celula"])
     # Seletor de dificuldade
     y_sel = 416
     nome = ORDEM_DIF[cfg["dif_idx"]]
-    texto(tela, F["m"], nome, t["texto"], centro=(cx, y_sel))
-    desenhar_seta(tela, 92, y_sel, -1, misturar(t["fundo"], t["texto"], 0.75))
-    desenhar_seta(tela, LARGURA - 92, y_sel, 1, misturar(t["fundo"], t["texto"], 0.75))
+    texto(tela, F["m"], nome, t["texto"], centro=(cx, y_sel), dy=-4)
+    cor_seta = misturar(t["fundo"], t["texto"], 0.75)
+    desenhar_icone(tela, app, "seta", (92, y_sel), 36, cor_seta, espelhar=True)
+    desenhar_icone(tela, app, "seta", (LARGURA - 92, y_sel), 36, cor_seta)
     app["ui"]["dif_ant"] = pygame.Rect(50, y_sel - 30, 90, 60)
     app["ui"]["dif_prox"] = pygame.Rect(LARGURA - 140, y_sel - 30, 90, 60)
     # Novo jogo
     y_novo = y_sel + 60
     desenhar_botao(tela, app, "novo", pygame.Rect(58, y_novo - 22, LARGURA - 116, 44), "Novo Jogo", F["m"])
 
-    # Lista expansível de modificadores
-    if aberto:
-        topo, base = y_novo + 50, ALTURA - 100
-        linha_h = min(54, (base - topo) // len(MODIFICADORES))
-        for i, (mod_id, info) in enumerate(MODIFICADORES.items()):
-            y = topo + i * linha_h
-            ativo = mod_id in cfg["mods"]
-            texto(tela, F["p"], info["nome"], t["texto"], esq=(60, y + linha_h * (0.34 if linha_h >= 44 else 0.5)))
-            if linha_h >= 44:
-                texto(tela, F["mini"], info["desc"], misturar(t["fundo"], t["texto"], 0.55),
-                      esq=(60, y + linha_h * 0.72))
-            sw = pygame.Rect(LARGURA - 104, y + linha_h // 2 - 12, 46, 24)
-            pygame.draw.rect(tela, t["celula"] if ativo else t["linha"], sw, border_radius=12)
-            pygame.draw.circle(tela, t["fundo"] if ativo else t["texto"],
-                               (sw.right - 12 if ativo else sw.x + 12, sw.centery), 8)
-            app["ui"]["mod_" + mod_id] = pygame.Rect(40, y, LARGURA - 80, linha_h)
-
     # Ícones inferiores
     y_ic = ALTURA - 60
-    n_ativos = len(cfg["mods"])
-    desenhar_engrenagem(tela, 110, y_ic, 15, t["celula"] if aberto else t["texto"], t["fundo"])
-    if n_ativos:
-        pygame.draw.circle(tela, t["celula"], (128, y_ic - 14), 9)
-        texto(tela, F["mini"], str(n_ativos), t["texto_cel"], centro=(128, y_ic - 14))
-    desenhar_icone_lista(tela, cx, y_ic, t["texto"])
-    desenhar_icone_info(tela, F, LARGURA - 110, y_ic, t["texto"], t["fundo"])
-    app["ui"]["modificadores"] = pygame.Rect(70, y_ic - 30, 80, 60)
-    app["ui"]["recordes"] = pygame.Rect(cx - 40, y_ic - 30, 80, 60)
-    app["ui"]["ajuda"] = pygame.Rect(LARGURA - 150, y_ic - 30, 80, 60)
+    desenhar_icone(tela, app, "lista", (cx - 60, y_ic), 90, t["texto"])
+    desenhar_icone(tela, app, "info", (cx + 60, y_ic), 48, t["texto"])
+    app["ui"]["recordes"] = pygame.Rect(cx - 100, y_ic - 30, 80, 60)
+    app["ui"]["ajuda"] = pygame.Rect(cx + 20, y_ic - 30, 80, 60)
 
 
 def desenhar_recordes(tela, app):
     t, F = app["tema"], app["fontes"]
-    desenhar_seta_voltar(tela, 40, 76, t["texto"])
+    desenhar_icone(tela, app, "voltar", (40, 76), 40, t["texto"])
     app["ui"]["voltar"] = pygame.Rect(5, 40, 70, 70)
     texto(tela, F["g"], "Recordes", t["texto"], centro=(LARGURA // 2, 150))
     y = 215
     for dif in ORDEM_DIF:
         texto(tela, F["m"], dif, t["celula"], esq=(50, y))
         lista = app["recordes"].get(dif, [])
-        for i in range(5):
+        for i in range(3):
             y += 30
             if i < len(lista):
                 r = lista[i]
@@ -935,7 +779,7 @@ def desenhar_recordes(tela, app):
 
 def desenhar_ajuda(tela, app):
     t, F = app["tema"], app["fontes"]
-    desenhar_seta_voltar(tela, 40, 76, t["texto"])
+    desenhar_icone(tela, app, "voltar", (40, 76), 40, t["texto"])
     app["ui"]["voltar"] = pygame.Rect(5, 40, 70, 70)
     texto(tela, F["g"], "Como jogar", t["texto"], centro=(LARGURA // 2, 150))
     linhas = [
@@ -975,11 +819,11 @@ def desenhar_interface(tela, app, t_agora):
 
 
 # =============================================================================
-# 6. EVENTOS, FLUXO (match-case) E LOOP PRINCIPAL
+# 5. EVENTOS, FLUXO (match-case) E LOOP PRINCIPAL
 # =============================================================================
 def iniciar_jogo(app):
     cfg = app["config"]
-    app["jogo"] = criar_estado_jogo(ORDEM_DIF[cfg["dif_idx"]], cfg["mods"])
+    app["jogo"] = criar_estado_jogo(ORDEM_DIF[cfg["dif_idx"]])
     app["jogo"]["t_inicio_transicao"] = agora()  # Marca o tempo inicial da animação
     app["paleta_aberta"] = False
     app["tela"] = "JOGO"
@@ -1015,8 +859,6 @@ def acionar_botao(app, chave):
             iniciar_jogo(app)
         case "menu":
             voltar_menu(app)
-        case "modificadores":
-            app["lista_mods_aberta"] = not app["lista_mods_aberta"]
         case "recordes":
             app["paleta_aberta"] = False
             app["tela"] = "RECORDES"
@@ -1030,8 +872,6 @@ def acionar_botao(app, chave):
         case _ if chave.startswith("tema_"):
             definir_tema(app, chave[len("tema_"):])
             app["paleta_aberta"] = False
-        case _ if chave.startswith("mod_"):
-            alternar_modificador(app["config"], chave[len("mod_"):])
 
 
 def tratar_clique(app, pos, botao):
@@ -1083,10 +923,6 @@ def tratar_eventos(app):
 def atualizar_jogo(app, dt, t):
     jogo = app["jogo"]
     match jogo["fase"]:
-        case "JOGANDO":
-            motivo = aplicar_modificadores(jogo, "tick")
-            if motivo:
-                iniciar_derrota(jogo, None)
         case "ANIM_DERROTA":
             animar_derrota(app, jogo, t)
         case "ANIM_VITORIA":
@@ -1101,11 +937,11 @@ def criar_app():
     return {
         "rodando": True, "tela": "MENU", "jogo": None,
         "tema_nome": TEMA_PADRAO, "tema": TEMAS[TEMA_PADRAO],
-        "paleta_aberta": False, "lista_mods_aberta": False,
-        "config": {"dif_idx": 0, "mods": set()},
+        "paleta_aberta": False,
+        "config": {"dif_idx": 0},
         "recordes": carregar_recordes(),
         "ui": {}, "mouse": (0, 0),
-        "familia": familia, "cache_fontes": {},
+        "familia": familia, "cache_fontes": {}, "cache_icones": {},
         "fontes": {"mini": mk(15), "p": mk(20), "m": mk(28), "g": mk(38), "xl": mk(64)},
     }
 
@@ -1125,7 +961,6 @@ def main():
         desenhar_interface(tela, app, t)
         pygame.display.flip()
     pygame.quit()
-
 
 if __name__ == "__main__":
     main()
